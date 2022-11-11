@@ -1,32 +1,29 @@
 #!/bin/bash
 
-# Figure out what conf/bms files should be used
-[[ -d "/etc/dmenu_bookmarks" ]] && DMENU_BM="/etc/dmenu_bookmarks"
-[[ -d "$HOME/.dmenu_bookmarks" ]] && DMENU_BM="$HOME/.dmenu_bookmarks"
-[[ -f "$DMENU_BM/conf" ]] && CONF="$DMENU_BM/conf"
-[[ -f "$DMENU_BM/bms" ]] && BMS="$DMENU_BM/bms"
+# Source defaults and - if available - user values
+[[ -f "/etc/dmenu_bookmarks/conf" ]] && source "/etc/dmenu_bookmarks/conf" || exit 1
+[[ -d "/etc/dmenu_bookmarks/bms"  ]] && BMS_PATH="/etc/dmenu_bookmarks/bms" || exit 2
+[[ -f "$DMENU_BMS_USER_FOLDER/conf"  ]] && source "/etc/dmenu_bookmarks/conf"
+[[ -d "$DMENU_BMS_USER_FOLDER/bms"   ]] && BMS_PATH="$DMENU_BMS_USER_FOLDER/bms"
 
-# Ensure the files exist
-[[ -z "$DMENU_BM" ]] && echo "ERROR: No dmenu_bookmarks folder (/etc/dmenu_bookmarks or \$HOME/.dmenu_bookmarks)" && exit 1
-[[ -z "$CONF" ]] && echo "ERROR: Missing conf file (should be in $DMENU_BM/conf)" && exit 2
-[[ -z "$BMS" ]] && echo "ERROR: Missing bms file (should be in $DMENU_BM/bms)" && exit 3
+# Iterate over folders and bookmark lists until the user selects a bookmark
+while [[ -d "$BMS_PATH" ]]; do
+  FOLDERS=$(ls --group-directories-first "$BMS_PATH" | head -n -1)
+  SINGLES=$(cat "$BMS_PATH/list")
 
-# Read the conf
-for line in $(cat $CONF); do
-  case "$line" in
-    verbose)
-      echo "SETTING: Verbose"
-      ;;
-    *)
-      echo "Unknown setting: $line"
-      STOP=1
-      ;;
-  esac
+  # Newline is needed if there are folders
+  if [[ -n "$FOLDERS" ]]; then
+    SELECTION=$(printf "$FOLDERS\n$SINGLES" | dmenu -i -l 50 -p 'Select bookmark:')
+  else
+    SELECTION=$(echo "$SINGLES" | dmenu -i -l 50 -p 'Select bookmark:')
+  fi
+
+  # If dmenu's return value is empty, the user pressed escape and wants to quit or landed in an empty folder
+  [[ -z "$SELECTION" ]] && exit
+
+  # Update the base path to the selected folder/list
+  BMS_PATH="$BMS_PATH/$SELECTION"
 done
 
-# If settings are rubish, stop running
-[[ "$STOP" -eq 1 ]] && echo "ERROR: Unknown settings in conf file. Please fix!" && exit 4
-
-# Read the bookmarks and send prompt to dmenu
-BOOKMARK="$(cat $BMS | dmenu -l 50 -p 'Select bookmark:')"
-xdotool type "$BOOKMARK"
+# Write the bookmark to wherever the user is focused
+xdotool type "$SELECTION"
