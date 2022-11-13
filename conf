@@ -1,1 +1,3 @@
-DMENU_BMS_USER_FOLDER="$HOME/dev/dmenu-bookmarks"
+DMBM_VERS=0.0.1
+DMBM_LINES=50
+DMBM_PROMPT="Select your bookmark:"
