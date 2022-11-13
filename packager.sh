@@ -15,6 +15,16 @@ failCleanAndExit () {
   exit 0
 }
 
+cleanAndExit () {
+  echo -n "Cleaning up... "
+  rm -rf dmbm_*-*_all* && echo "Done!" && exit 0
+  echo "Error during cleanup - aborting!"
+  exit 1
+}
+
+# Check if user just wants to clean
+[[ $1 =~ '--clean' ]] && cleanAndExit
+
 # Create necessary folders
 VER=0
 REV=$(git log --oneline | wc -l)
@@ -45,3 +55,6 @@ sed -i "s/PLACEHOLDERFORVERSION\$/$VER-$REV/g" "dmbm_$VER-$REV"'_all/usr/bin/dmb
 
 # Generate .deb file from it
 dpkg --build "$PKG"
+
+# Remove generated package folder
+[[ ! $1 =~ '--keep' ]] && rm -rf "$PKG"
