@@ -46,8 +46,8 @@ writeReturnToCursor () { xdotool key 'Return'; }
 
 # MAIN
 # Source defaults and - if available - user values
-[[ -f "/etc/dmenu_bookmarks/conf" ]] && source "/etc/dmenu_bookmarks/conf" || exit 1
-[[ -d "/etc/dmenu_bookmarks/bms"  ]] && BMS_PATH="/etc/dmenu_bookmarks/bms" || exit 2
+[[ -f "/etc/dmbm/conf" ]] && source "/etc/dmbm/conf" || exit 1
+[[ -d "/etc/dmbm/bms"  ]] && BMS_PATH="/etc/dmbm/bms" || exit 2
 [[ -f "$DMBM_USERPATH/conf"  ]] && source "$DMBM_USERPATH/conf"
 [[ -d "$DMBM_USERPATH/bms"   ]] && BMS_PATH="$DMBM_USERPATH/bms"
 
