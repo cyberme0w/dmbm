@@ -26,15 +26,16 @@ cleanAndExit () {
 [[ $1 =~ '--clean' ]] && cleanAndExit
 
 # Create necessary folders
-VER=0
-REV=$(git log --oneline | wc -l)
-PKG="dmbm_$VER-$REV"'_all'
+MAJ=0
+MIN=1
+PATCH=$(git log --oneline | wc -l)
+PKG="dmbm_$MAJ.$MIN-$PATCH"'_all'
 mkdir -p "$PKG" "$PKG/DEBIAN" "$PKG/usr/bin" || failCleanAndExit
 
 # Create DEBIAN/control
 printf '%s\n' \
   'Package: dmbm' \
-  "Version: $VER-$REV" \
+  "Version: $MAJ.$MIN-$PATCH" \
   'Architecture: all' \
   'Maintainer: Iúri Archer (cyberme0w@hotmail.com)' \
   'Depends: dmenu (>= 5.0)' \
@@ -51,7 +52,7 @@ printf '%s\n' \
 cp 'dmbm.sh' "$PKG/usr/bin/dmbm" || failCleanAndExit
 
 # Update the version saved in the script
-sed -i "s/PLACEHOLDERFORVERSION\$/$VER-$REV/g" "dmbm_$VER-$REV"'_all/usr/bin/dmbm'
+sed -i "s/PLACEHOLDERFORVERSION\$/$MAJ.$MIN-$PATCH/g" "dmbm_$MAJ.$MIN-$PATCH"'_all/usr/bin/dmbm'
 
 # Generate .deb file from it
 dpkg --build "$PKG"

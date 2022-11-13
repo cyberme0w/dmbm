@@ -34,7 +34,7 @@ Installing via your package manager will likely be the simplest method.
 With that said, the manual installation is also pretty straightforward.
 
 ### ... as a .deb package
-1. Download the latest [RELEASE](link)
+1. Download the latest [RELEASE](https://github.com/cyberme0w/dmbm/releases)
 2. `cd` to the directory with the downloaded `dmbm.deb` file - this is usually `$HOME/Downloads`
 3. Run `apt install ./dmbm.deb`
 
