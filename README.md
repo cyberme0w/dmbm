@@ -17,6 +17,8 @@ DMBM saves your bookmarks as plain text files, which is nice for versioning.
 It also supports folder structures, so you can organize your bookmarks to
 your heart's delight.
 
+![](preview/basic-usage-browser.gif)
+
 ## Usage:
 
 ```
