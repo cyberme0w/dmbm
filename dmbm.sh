@@ -4,6 +4,7 @@
 DMBM_VERS=PLACEHOLDERFORVERSION
 DMBM_LINES=50
 DMBM_PROMPT='Select your bookmark:'
+DMBM_USERPATH=''
 
 # FUNCTIONS
 # Print usage and exit with success
@@ -24,15 +25,18 @@ usage () {
   return 0
 }
 
-# Check if it is the first time the user is running dmbm and set things up
-checkFirstTimeRun () {
+# Find user's config path
+findUserConfig () {
   # Magic can happen either in the XDG folder or in .config
   if [[ -z "$XDG_CONFIG_HOME" ]]; then
     DMBM_USERPATH="$HOME/.config/dmbm"
   else
     DMBM_USERPATH="$XDG_CONFIG_HOME/dmbm"
   fi
+}
 
+# Check if it is the first time the user is running dmbm and set things up
+checkFirstTimeRun () {
   # If the dmbm/bms folder already exists, no need to do anything
   [[ -d "$DMBM_USERPATH/bms" ]] && return 0
   
@@ -70,13 +74,12 @@ writeReturnToCursor () { xdotool key 'Return'; }
 
 # MAIN
 # Check if it's the user's first run and if necessary create the folder structure
+findUserConfig
 checkFirstTimeRun
 
-# Source defaults and - if available - user values
-[[ -f "/etc/dmbm/conf" ]] && source "/etc/dmbm/conf" || exit 1
-[[ -d "/etc/dmbm/bms"  ]] && BMS_PATH="/etc/dmbm/bms" || exit 2
+# Source user config and set starting bms path
 [[ -f "$DMBM_USERPATH/conf"  ]] && source "$DMBM_USERPATH/conf"
-[[ -d "$DMBM_USERPATH/bms"   ]] && BMS_PATH="$DMBM_USERPATH/bms"
+BMS_PATH="$DMBM_USERPATH/bms"
 
 # Parse options and do magic
 if [[ $# -gt 0 ]]; then
