@@ -4,12 +4,11 @@
 # Exit gracefully when shit hits the fan
 failCleanAndExit () {
   echo "Something went wrong during packaging!"
-  echo "Delete unfinished package ($PKG)? "
-  read -r -p "(y/N) "
-  if [[ ! ${yesno,,} =~ ^(y|yes)$ ]]; then
-    echo "Deleting $PKG"
+  read -r -p "Delete unfinished package($PKG)? (y/N) " YESNO
+  if [[ ${YESNO,,} =~ ^(y|yes)$ ]]; then
+    echo -n "Deleting $PKG... "
     rm -rf "$PKG"
-    echo "done"
+    echo "Done!"
   fi
   
   echo "Will now exit. Good luck bug hunting!"
@@ -20,11 +19,10 @@ failCleanAndExit () {
 VER=0
 REV=$(git log --oneline | wc -l)
 PKG="dmbm_$VER-$REV"'_all'
-mkdir -p "$PKG/DEBIAN"
-mkdir -p "$PKG/usr/bin"
+mkdir -p "$PKG" "$PKG/DEBIAN" "$PKG/usr/bin" || failCleanAndExit
 
-# Create DEBIAN/config
-touch "$PKG/DEBIAN/config" && printf '%s\n' \
+# Create DEBIAN/control
+printf '%s\n' \
   'Package: dmbm' \
   "Version: $VER-$REV" \
   'Architecture: all' \
@@ -37,7 +35,7 @@ touch "$PKG/DEBIAN/config" && printf '%s\n' \
   '  Features include:' \
   '    * Folder support' \
   '    * Add/edit/delete bookmarks directly in the dmenu prompt' \
-  '    * Bookmarks are stored in simple flatfiles' > "$PKG/DEBIAN/config"
+  '    * Bookmarks are stored in simple flatfiles' > "$PKG/DEBIAN/control" || failCleanAndExit
 
 # Copy stuff over
 cp 'dmbm.sh' "$PKG/usr/bin/dmbm" || failCleanAndExit
