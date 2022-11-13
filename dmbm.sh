@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# DEFAULT CONFIG
+DMBM_VERS=PLACEHOLDERFORVERSION
+DMBM_LINES=50
+DMBM_PROMPT='Select your bookmark:'
+
 # FUNCTIONS
 # Print usage and exit with success
 usage () {
@@ -17,6 +22,25 @@ usage () {
          '' \
          '(press Escape or Enter to close)' #| tee >(dmenu -l "$DMBM_LINES" >> /dev/null)
   return 0
+}
+
+# Check if it is the first time the user is running dmbm and set things up
+checkFirstTimeRun () {
+  # Magic can happen either in the XDG folder or in .config
+  if [[ -z "$XDG_CONFIG_HOME" ]]; then
+    DMBM_USERPATH="$HOME/.config/dmbm"
+  else
+    DMBM_USERPATH="$XDG_CONFIG_HOME/dmbm"
+  fi
+
+  # If the dmbm/bms folder already exists, no need to do anything
+  [[ -d "$DMBM_USERPATH/bms" ]] && return 0
+  
+  # Otherwise, generate the dmbm/bms folder with a basic entry
+  echo "Generating user folder..."
+  mkdir -p "$DMBM_USERPATH/bms"
+  echo "https://wikipedia.org/Lorem_ipsum" > "$DMBM_USERPATH/bms/list"
+  echo "Done!"
 }
 
 # Prompt user to select a bookmark, and update the BMS_PATH as well as SELECTION vars
@@ -45,6 +69,9 @@ writeSelectionToCursor () { xdotool type --delay 0 "$SELECTION"; }
 writeReturnToCursor () { xdotool key 'Return'; }
 
 # MAIN
+# Check if it's the user's first run and if necessary create the folder structure
+checkFirstTimeRun
+
 # Source defaults and - if available - user values
 [[ -f "/etc/dmbm/conf" ]] && source "/etc/dmbm/conf" || exit 1
 [[ -d "/etc/dmbm/bms"  ]] && BMS_PATH="/etc/dmbm/bms" || exit 2
@@ -79,7 +106,7 @@ if [[ $# -gt 0 ]]; then
   esac
 fi
 
-# Still here? No options exited yet, so run dmbm normally
+# Still here? No options made the script return, so run dmbm normally
 selectBookmark
 writeSelectionToCursor
 [[ $DMBM_ENTER -eq 1 ]] && sleep 0.1 && writeReturnToCursor
