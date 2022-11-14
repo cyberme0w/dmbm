@@ -24,7 +24,8 @@ your heart's delight.
 ```
 ./dmbm.sh                 > Launch DMBM. Press Escape to cancel.
 ./dmbm.sh --append-return > Appends a 'Return' to the bookmark (will open the bookmark automatically in browsers).
-./dmbm.sh -a              > Create a bookmark with the currently selected text and prompt the user on where to store it.
+./dmbm.sh -a              > Create a bookmark with the text in the current clipboard and prompt the user on where to store it.
+./dmbm.sh -e              > Select a bookmark and prompt the user for the new bookmark
 ./dmbm.sh -d              > Prompts the user to select a bookmark and removes it from the list.
 ```
 

@@ -68,9 +68,42 @@ selectBookmark () {
   done
 }
 
+selectFolder () {
+  HEREFOLDER='[save here]'
+  while [[ ! "$BMS_PATH" =~ "$HEREFOLDER" ]]; do
+    FOLDERS=$(ls --group-directories-first "$BMS_PATH" | head -n -1)
+    
+    # Newline is needed if there are folders
+    if [[ -n "$FOLDERS" ]]; then
+      SELECTION=$(printf "$HEREFOLDER\n$FOLDERS" | dmenu -i -l "$DMBM_LINES" -p "Select a folder for your bookmark ($HIGHLIGHT):")
+    else
+      SELECTION=$(echo "$HEREFOLDER" | dmenu -i -l "$DMBM_LINES" -p "Select a folder for your bookmark ($HIGHLIGHT):")
+    fi
+
+    # Make sure user doesn't want to exit
+    [[ -z "$SELECTION" ]] && exit
+
+    # Select folder -> continue, Select [save here] -> break
+    if [[ "$SELECTION" == "$HEREFOLDER" ]]; then
+      BMS_PATH="$BMS_PATH/list"
+      break
+    else
+      BMS_PATH="$BMS_PATH/$SELECTION"
+    fi
+  done
+
+  # Append new bookmark to selected list file
+  echo "$HIGHLIGHT" >> "$BMS_PATH"
+}
+
 # Write the selected bookmark saved in $SELECTION to the active cursor position
 writeSelectionToCursor () { xdotool type --delay 0 "$SELECTION"; }
 writeReturnToCursor () { xdotool key 'Return'; }
+
+# Get the highlighted text and store it in $HIGHLIGHT
+getHighlightedText () {
+  HIGHLIGHT=$(xclip -o -selection clipboard)
+}
 
 # MAIN
 # Check if it's the user's first run and if necessary create the folder structure
@@ -89,7 +122,11 @@ if [[ $# -gt 0 ]]; then
       DMBM_ENTER=1
       ;;
     -a)
-      echo "TODO: -a" && exit
+      # Get the highlighted text into the $HIGHLIGHT var
+      getHighlightedText
+
+      # Prompt the user for the folder in which to save the bookmark
+      selectFolder
       ;;
     -e)
       echo "TODO: -e" && exit
