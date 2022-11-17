@@ -1,95 +1,64 @@
 #!/bin/bash
 
 # DEFAULT CONFIG
-DMBM_VERS=PLACEHOLDERFORVERSION
-DMBM_LINES=50
-DMBM_PROMPT='Select your bookmark:'
+USAGE='dmbm - the browser-independent bookmark manager for dmenu
+USAGE:
+  dmbm [-r] - select and paste a bookmark with/without return
+  dmbm -a   - add a bookmark
+  dmbm -e   - edit a bookmark
+  dmbm -d   - delete a bookmark
+  dmbm -h   - display this help message'
+BMS_PATH="$HOME/.local/share/dmbm/bms"
+CONF_PATH="$HOME/.config/dmbm/config"
 DMBM_USERPATH=''
+MAX_DROPDOWN_LENGTH=20
 
 # FUNCTIONS
-# Print usage and exit with success
-usage () {
-  printf '%s\n' \
-         "dmbm - v$DMBM_VERS - conf file @ \"$DMBM_USERPATH\"" \
-         '' \
-         'USAGE:' \
-         '  dmbm [--append-return]   - paste a bookmark to the current cursor position with/without a finishing Return' \
-         '  dmbm -a - add a bookmark' \
-         '  dmbm -e - edit a bookmark' \
-         '  dmbm -d - delete a bookmark' \
-         '  dmbm -h - display this help message' \
-         'OPTIONS:' \
-         '  '
-         '' \
-         '(press Escape or Enter to close)' #| tee >(dmenu -l "$DMBM_LINES" >> /dev/null)
-  return 0
-}
-
-# Find user's config path
-findUserConfig () {
-  # Magic can happen either in the XDG folder or in .config
-  if [[ -z "$XDG_CONFIG_HOME" ]]; then
-    DMBM_USERPATH="$HOME/.config/dmbm"
-  else
-    DMBM_USERPATH="$XDG_CONFIG_HOME/dmbm"
-  fi
-}
-
-# Check if it is the first time the user is running dmbm and set things up
-checkFirstTimeRun () {
-  # If the dmbm/bms folder already exists, no need to do anything
-  [[ -d "$DMBM_USERPATH/bms" ]] && return 0
-  
-  # Otherwise, generate the dmbm/bms folder with a basic entry
-  echo "Generating user folder..."
-  mkdir -p "$DMBM_USERPATH/bms"
-  echo "https://wikipedia.org/Lorem_ipsum" > "$DMBM_USERPATH/bms/list"
-  echo "Done!"
-}
-
 # Prompt user to select a bookmark, and update the BMS_PATH as well as SELECTION vars
 selectBookmark () {
+  PROMPT="Select bookmark: BOOKMARKS"
   while [[ -d "$BMS_PATH" ]]; do
+    # Find all bookmarks and folders in the current path
     FOLDERS=$(ls --group-directories-first "$BMS_PATH" | head -n -1)
     SINGLES=$(cat "$BMS_PATH/list")
 
-    # Newline is needed if there are folders
-    if [[ -n "$FOLDERS" ]]; then
-      SELECTION=$(printf "$FOLDERS\n$SINGLES" | dmenu -i -l "$DMBM_LINES" -p "$DMBM_PROMPT")
-    else
-      SELECTION=$(echo "$SINGLES" | dmenu -i -l "$DMBM_LINES" -p "$DMBM_PROMPT")
-    fi
+    # Group them together into one array
+    BMS=''
+    [[ -n "$FOLDERS" ]] && BMS+="$FOLDERS\n"
+    BMS+="$SINGLES"
+
+    # Pass it on to dmenu and get the picked bookmark/folder
+    SELECTION=$(echo -e "$BMS" | dmenu -i -l "$MAX_DROPDOWN_LENGTH" -p "$PROMPT")
 
     # If dmenu's return value is empty, the user pressed escape and wants to quit or landed in an empty folder
     [[ -z "$SELECTION" ]] && exit
 
     # Update the base path to the selected folder/list
-    BMS_PATH="$BMS_PATH/$SELECTION"
+    PROMPT+="/$SELECTION"
+    BMS_PATH+="/$SELECTION"
   done
 }
 
 selectFolder () {
   HEREFOLDER='[save here]'
+  PROMPT="Save ($HIGHLIGHT) to BOOKMARKS"
   while [[ ! "$BMS_PATH" =~ "$HEREFOLDER" ]]; do
+    # Find all folders
     FOLDERS=$(ls --group-directories-first "$BMS_PATH" | head -n -1)
-    
-    # Newline is needed if there are folders
-    if [[ -n "$FOLDERS" ]]; then
-      SELECTION=$(printf "$HEREFOLDER\n$FOLDERS" | dmenu -i -l "$DMBM_LINES" -p "Select a folder for your bookmark ($HIGHLIGHT):")
-    else
-      SELECTION=$(echo "$HEREFOLDER" | dmenu -i -l "$DMBM_LINES" -p "Select a folder for your bookmark ($HIGHLIGHT):")
-    fi
+
+    # Add the "save here" option to the list
+    BMS="$HEREFOLDER\n$FOLDERS"
+
+    # Pass the folders to dmenu and get the picked folder
+    SELECTION=$(echo -e "$BMS" | dmenu -i -l "$MAX_DROPDOWN_LENGTH" -p "$PROMPT")
 
     # Make sure user doesn't want to exit
     [[ -z "$SELECTION" ]] && exit
 
     # Select folder -> continue, Select [save here] -> break
-    if [[ "$SELECTION" == "$HEREFOLDER" ]]; then
-      BMS_PATH="$BMS_PATH/list"
-      break
-    else
-      BMS_PATH="$BMS_PATH/$SELECTION"
-    fi
+    [[ "$SELECTION" == "$HEREFOLDER" ]] && BMS_PATH+="/list" && break
+    BMS_PATH+="/$SELECTION"
+    PROMPT+="/$SELECTION"
   done
 
   # Append new bookmark to selected list file
@@ -101,29 +70,36 @@ writeSelectionToCursor () { xdotool type --delay 0 "$SELECTION"; }
 writeReturnToCursor () { xdotool key 'Return'; }
 
 # Get the highlighted text and store it in $HIGHLIGHT
-getHighlightedText () {
-  HIGHLIGHT=$(xclip -o -selection clipboard)
-}
+getHighlight () { HIGHLIGHT=$(xclip -o -selection clipboard); }
 
-# MAIN
-# Check if it's the user's first run and if necessary create the folder structure
-findUserConfig
-checkFirstTimeRun
+########
+# MAIN #
+########
 
-# Source user config and set starting bms path
-[[ -f "$DMBM_USERPATH/conf"  ]] && source "$DMBM_USERPATH/conf"
-BMS_PATH="$DMBM_USERPATH/bms"
+# Source base config
+[[ -f '/etc/dmbm/config' ]] && source '/etc/dmbm/config' || exit 1
+
+# Source user config (optional)
+[[ -z "$XDG_CONFIG_HOME" ]] \
+  && CONF_PATH="$HOME/.config/dmbm/config" \
+  || CONF_PATH="$XDG_CONFIG_HOME/dmbm/config"
+[[ -f "$CONF_PATH" ]] && source "$CONF_PATH"
+
+# Check if there is a bookmarks folder/create one if needed
+[[ ! -d "$BMS_PATH" ]] \
+  && mkdir -p "$BMS_PATH" \
+  && echo "https://wikipedia.org/Lorem_ipsum" > "$BMS_PATH/list"
 
 # Parse options and do magic
 if [[ $# -gt 0 ]]; then
-  [[ $# -gt 1 ]] && usage && exit 3
+  [[ $# -gt 1 ]] && echo "$USAGE" && exit 3
   case $1 in
-    --append-return)
+    -r)
       DMBM_ENTER=1
       ;;
     -a)
       # Get the highlighted text into the $HIGHLIGHT var
-      getHighlightedText
+      getHighlight
 
       # Prompt the user for the folder in which to save the bookmark
       selectFolder
@@ -138,7 +114,7 @@ if [[ $# -gt 0 ]]; then
       echo "TODO: -f" && exit
       ;;
     -h)
-      usage && exit
+      echo "$USAGE" && exit
       ;;
     *)
       echo "dmbm.sh: Unknown option ($1)" && exit 4

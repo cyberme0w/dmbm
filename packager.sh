@@ -23,14 +23,14 @@ cleanAndExit () {
 }
 
 # Check if user just wants to clean
-[[ $1 =~ '--clean' ]] && cleanAndExit
+[[ "$1" =~ '--clean' ]] && cleanAndExit
 
 # Create necessary folders
 MAJ=0
 MIN=1
 PATCH=$(git log --oneline | wc -l)
 PKG="dmbm_$MAJ.$MIN-$PATCH"'_all'
-mkdir -p "$PKG" "$PKG/DEBIAN" "$PKG/usr/bin" || failCleanAndExit
+mkdir -p "$PKG" "$PKG/DEBIAN" "$PKG/usr/bin" "$PKG/etc/dmbm" || failCleanAndExit
 
 # Create DEBIAN/control
 printf '%s\n' \
@@ -38,7 +38,7 @@ printf '%s\n' \
   "Version: $MAJ.$MIN-$PATCH" \
   'Architecture: all' \
   'Maintainer: Iúri Archer (cyberme0w@hotmail.com)' \
-  'Depends: dmenu (>= 5.0)' \
+  'Depends: suckless-tools (>= 46-2)' \
   'Homepage: https://github.com/cyberme0w/dmbm' \
   'Description: a minimal bookmarking extension for dmenu' \
   '  dmbm is a browser-independent "do-as-little-as-it-should"' \
@@ -50,6 +50,7 @@ printf '%s\n' \
 
 # Copy stuff over
 cp 'dmbm.sh' "$PKG/usr/bin/dmbm" || failCleanAndExit
+cp 'config' "$PKG/etc/dmbm/config" || failCleanAndExit
 
 # Update the version saved in the script
 sed -i "s/PLACEHOLDERFORVERSION\$/$MAJ.$MIN-$PATCH/g" "dmbm_$MAJ.$MIN-$PATCH"'_all/usr/bin/dmbm'

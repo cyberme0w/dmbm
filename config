@@ -1,0 +1,9 @@
+USAGE='dmbm - the browser-independent bookmark manager for dmenu
+USAGE:
+  dmbm [-r] - select and paste a bookmark with/without return
+  dmbm -a                - add a bookmark
+  dmbm -e                - edit a bookmark
+  dmbm -d                - delete a bookmark
+  dmbm -h                - display this help message'
+PROMPT='BOOKMARKS'
+BMS_PATH="$HOME/.local/share/dmbm/bms"
