@@ -1,129 +1,146 @@
 #!/bin/bash
 
-# DEFAULT CONFIG
+VERSION='PLACEHOLDERFORVERSION'
 USAGE='dmbm - the browser-independent bookmark manager for dmenu
 USAGE:
-  dmbm [-r] - select and paste a bookmark with/without return
+  dmbm [-r] - select and paste a bookmark [with return]
+  dmbm -b   - open bookmark with browser
   dmbm -a   - add a bookmark
   dmbm -e   - edit a bookmark
   dmbm -d   - delete a bookmark
-  dmbm -h   - display this help message'
-BMS_PATH="$HOME/.local/share/dmbm/bms"
-CONF_PATH="$HOME/.config/dmbm/config"
-DMBM_USERPATH=''
-MAX_DROPDOWN_LENGTH=20
+  dmbm -h   - display this help message
+  dmbm -g   - turn on debugging output'
 
-# FUNCTIONS
-# Prompt user to select a bookmark, and update the BMS_PATH as well as SELECTION vars
-selectBookmark () {
-  PROMPT="Select bookmark: BOOKMARKS"
-  while [[ -d "$BMS_PATH" ]]; do
-    # Find all bookmarks and folders in the current path
-    FOLDERS=$(ls --group-directories-first "$BMS_PATH" | head -n -1)
-    SINGLES=$(cat "$BMS_PATH/list")
+# Print ${1} if DEBUG is set to true
+debug() { [[ $DEBUG -eq true ]] && echo "${1}" ; }
 
-    # Group them together into one array
-    BMS=''
-    [[ -n "$FOLDERS" ]] && BMS+="$FOLDERS\n"
-    BMS+="$SINGLES"
+# Print version to STDOUT
+exit_with_version() { echo "dmbm v$VERSION" && exit 0 ; }
 
-    # Pass it on to dmenu and get the picked bookmark/folder
-    SELECTION=$(echo -e "$BMS" | dmenu -i -l "$MAX_DROPDOWN_LENGTH" -p "$PROMPT")
+# Show USAGE and quit gracefully
+exit_with_usage() { echo "$USAGE" && exit 0 ; }
 
-    # If dmenu's return value is empty, the user pressed escape and wants to quit or landed in an empty folder
-    [[ -z "$SELECTION" ]] && exit
-
-    # Update the base path to the selected folder/list
-    PROMPT+="/$SELECTION"
-    BMS_PATH+="/$SELECTION"
-  done
+# Run a standard dmenu prompt with optional parameters
+run_prompted_dmenu() {
+  list=${1}
+  prompt=${2}
+  lines=${3:-20}
+  rc=$(echo -e "$list" | dmenu -i -p "$prompt" -l "$lines")
+  echo "$rc"
 }
 
-selectFolder () {
-  HEREFOLDER='[save here]'
-  PROMPT="Save ($HIGHLIGHT) to BOOKMARKS"
-  while [[ ! "$BMS_PATH" =~ "$HEREFOLDER" ]]; do
-    # Find all folders
-    FOLDERS=$(ls --group-directories-first "$BMS_PATH" | head -n -1)
+# Run a yes/no dmenu prompt
+run_yes_no_dmenu() {
+  prompt=${1:-"Are you sure?"}
+  res=$(run_prompted_dmenu "Yes\nNo" "$prompt" 2)
+  [[ "$res" == "Yes" ]] && return 1
+  return 0
+}
 
-    # Add the "save here" option to the list
-    BMS="$HEREFOLDER\n$FOLDERS"
+# Initialize BMS and add any folders in the current BMS_PATH to the variable
+add_folders_to_bms_list() {
+  BMS=''
+  FOLDERS=$(ls --group-directories-first "$BMS_PATH" | head -n -1)
+  [[ -n "$FOLDERS" ]] && BMS="$FOLDERS\n"
+}
 
-    # Pass the folders to dmenu and get the picked folder
-    SELECTION=$(echo -e "$BMS" | dmenu -i -l "$MAX_DROPDOWN_LENGTH" -p "$PROMPT")
+# Append any single bookmarks in the current BMS_PATH to BMS
+add_singles_to_bms_list() {
+  # Throw all rows into a variable
+  SINGLES=$(cat "$BMS_PATH/list")
+  declare -a singles_for_bms
 
-    # Make sure user doesn't want to exit
-    [[ -z "$SELECTION" ]] && exit
+  # Parse each line
+  readarray -d "\n" -t singles_arr <<< "$SINGLES"
+  for line in "${singles_arr[@]}"; do
+    readarray -d "|" -t l <<< "$line"
+    echo "${l[0]}"
+    echo "${l[1]}"
+  done
+  
+  BMS="$BMS""$SINGLES"
+}
 
-    # Select folder -> continue, Select [save here] -> break
-    [[ "$SELECTION" == "$HEREFOLDER" ]] && BMS_PATH+="/list" && break
-    BMS_PATH+="/$SELECTION"
-    PROMPT+="/$SELECTION"
+# Prompt user to select a bookmark, starting at BMS_BASE
+select_bookmark() {
+  BMS_PATH="$BMS_BASE"
+  while :
+  do
+    add_folders_to_bms_list
+    add_singles_to_bms_list
+    
+    SELECTION=$(run_prompted_dmenu "$BMS" "$PROMPT" "$MAX_DROPDOWN_LENGTH")
+    [[ -z "$SELECTION" ]] && exit 0
+    [[ ! -d "$BMS_PATH/$SELECTION" ]] && break
+    PROMPT="$PROMPT/$SELECTION"
+    BMS_PATH="$BMS_PATH/$SELECTION"
   done
 
-  # Append new bookmark to selected list file
-  echo "$HIGHLIGHT" >> "$BMS_PATH"
+  readarray -d "|" -t arr <<< "$SELECTION"
+  SELECTION_NAME=${arr[0]}
+  SELECTION_URL=${arr[1]}
+}
+
+# Prompt user to pick a bookmark, then ask under what name it should be saved, and if the url should be changed
+edit_bookmark() {
+  PROMPT="Select bookmark to edit: BMS"
+  select_bookmark
+  run_prompted_dmenu "$SELECTION" "Bookmark name: $SELECTION" 0
+
+  echo "$BMS_PATH"
+}
+
+# Prompt user to select a bookmark, starting at BMS_BASE and then delete it
+delete_bookmark() {
+  PROMPT="Delete bookmark: BMS"
+  select_bookmark
+  rc=run_yes_no_dmenu "Are you sure you want to delete the following bookmark? $SELECTION"
+  [[ $rc ]] && echo "TODO"
 }
 
 # Write the selected bookmark saved in $SELECTION to the active cursor position
-writeSelectionToCursor () { xdotool type --delay 0 "$SELECTION"; }
-writeReturnToCursor () { xdotool key 'Return'; }
+write_selection_to_cursor() { xdotool type --delay 0 "$SELECTION_URL"; }
+write_return_to_cursor() { xdotool key 'Return'; }
 
-# Get the highlighted text and store it in $HIGHLIGHT
-getHighlight () { HIGHLIGHT=$(xclip -o -selection clipboard); }
+# Launch browser
+open_selection_with_browser() { $BROWSER "$SELECTION_URL" ; }
 
-########
-# MAIN #
-########
+#############
+# DMBM MAIN #
+#############
 
-# Source base config
+# Import standard config from /etc/dmbm/config
 [[ -f '/etc/dmbm/config' ]] && source '/etc/dmbm/config' || exit 1
 
-# Source user config (optional)
-[[ -z "$XDG_CONFIG_HOME" ]] \
-  && CONF_PATH="$HOME/.config/dmbm/config" \
-  || CONF_PATH="$XDG_CONFIG_HOME/dmbm/config"
-[[ -f "$CONF_PATH" ]] && source "$CONF_PATH"
+# Import user config from $USER_CONF (sourced from default config)
+[[ -f "$USER_CONF" ]] && source "$USER_CONF"
 
-# Check if there is a bookmarks folder/create one if needed
-[[ ! -d "$BMS_PATH" ]] \
-  && mkdir -p "$BMS_PATH" \
-  && echo "https://wikipedia.org/Lorem_ipsum" > "$BMS_PATH/list"
-
-# Parse options and do magic
+# Process options passed in ARGV
 if [[ $# -gt 0 ]]; then
   [[ $# -gt 1 ]] && echo "$USAGE" && exit 3
   case $1 in
-    -r)
-      DMBM_ENTER=1
-      ;;
-    -a)
-      # Get the highlighted text into the $HIGHLIGHT var
-      getHighlight
-
-      # Prompt the user for the folder in which to save the bookmark
-      selectFolder
-      ;;
-    -e)
-      echo "TODO: -e" && exit
-      ;;
-    -d)
-      echo "TODO: -d" && exit
-      ;;
-    -f)
-      echo "TODO: -f" && exit
-      ;;
-    -h)
-      echo "$USAGE" && exit
-      ;;
-    *)
-      echo "dmbm.sh: Unknown option ($1)" && exit 4
-      ;;
+    -v) exit_with_version ;;
+    -r) APPEND_RETURN=true ;;
+    -b) OPEN_BROWSER=true ;;
+    -d) delete_bookmark; exit 0 ;;
+    -a) get_highlight; select_folder ;;
+    -e) edit_bookmark; exit 0 ;;
+    -h) exit_with_usage ;;
+    *) echo "dmbm.sh: Unknown option ($1)" && exit 4 ;;
   esac
 fi
 
-# Still here? No options made the script return, so run dmbm normally
-selectBookmark
-writeSelectionToCursor
-[[ $DMBM_ENTER -eq 1 ]] && sleep 0.1 && writeReturnToCursor
+# Check if there is a bookmarks folder/create one if needed
+[[ ! -d "$BMS_BASE" ]] \
+  && mkdir -p "$BMS_BASE" \
+  && echo "https://github.com/cyberme0w/dmbm" > "$BMS_BASE/list"
+
+# Nothing caused the script to exit - run dmbm normally
+PROMPT="Select a bookmark: BMS"
+select_bookmark
+if [[ $OPEN_BROWSER == true ]]; then
+  open_selection_with_browser
+else
+  write_selection_to_cursor
+fi
 
