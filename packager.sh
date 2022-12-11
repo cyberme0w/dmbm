@@ -3,7 +3,8 @@
 
 USAGE='packager.sh
   --help   - print this help message
-  --clean  - remove .deb packages and packaged folder structure'
+  --clean  - remove .deb packages and packaged folder structure
+  --keep   - after building .deb, do not remove folder structure'
 
 # Exit gracefully when shit hits the fan
 fail_clean_and_exit () {
@@ -63,7 +64,7 @@ cp 'dmbm.sh' "$PKG/usr/bin/dmbm" || fail_clean_and_exit
 cp 'config' "$PKG/etc/dmbm/config" || fail_clean_and_exit
 
 # Update the version saved in the script
-sed -i "s/PLACEHOLDERFORVERSION\$/$MAJ.$MIN-$PATCH/g" "dmbm_$MAJ.$MIN-$PATCH"'_all/usr/bin/dmbm'
+sed -i -e "s/PLACEHOLDERFORVERSION\$/$MAJ.$MIN-$PATCH/g" "dmbm_$MAJ.$MIN-$PATCH"'_all/usr/bin/dmbm'
 
 # Generate .deb file from it
 dpkg --build "$PKG"

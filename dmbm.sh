@@ -151,7 +151,7 @@ fi
 # Nothing caused the script to exit - run dmbm normally
 PROMPT="Select a bookmark: BMS"
 select_bookmark
-if [[ $OPEN_BROWSER == true ]]; then
+if [[ $OPEN_BROWSER == 'true' ]]; then
   open_selection_with_browser
 else
   write_selection_to_cursor
