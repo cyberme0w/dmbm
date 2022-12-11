@@ -54,8 +54,8 @@ add_singles_to_bms_list() {
   readarray -d "\n" -t singles_arr <<< "$SINGLES"
   for line in "${singles_arr[@]}"; do
     readarray -d "|" -t l <<< "$line"
-    echo "${l[0]}"
-    echo "${l[1]}"
+    #echo "${l[0]}"
+    #echo "${l[1]}"
   done
   
   BMS="$BMS""$SINGLES"
@@ -85,9 +85,22 @@ select_bookmark() {
 edit_bookmark() {
   PROMPT="Select bookmark to edit: BMS"
   select_bookmark
-  run_prompted_dmenu "$SELECTION" "Bookmark name: $SELECTION" 0
+  old_row="$SELECTION"
 
-  echo "$BMS_PATH"
+  # Make sure the new name is not empty before continuing
+  new_name=$(run_prompted_dmenu "$SELECTION_NAME" "Editing name for bookmark: $SELECTION_NAME" 0)
+  [[ -z $new_name ]] && exit
+
+  # Make sure the URL is not empty before continuing
+  new_url=$(run_prompted_dmenu "$SELECTION_URL" "Editing URL for bookmark: $SELECTION_URL" 0)
+  [[ -z $new_url ]] && exit
+
+  # Output some info for debugging
+  debug "New name: $new_name"
+  debug "New URL: $new_url"
+
+  # Replace bookmark in-file
+  sed -i "s!$old_row!$new_name\|$new_url!g" "$BMS_PATH/list"
 }
 
 # Prompt user to select a bookmark, starting at BMS_BASE and then delete it
