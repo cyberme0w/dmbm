@@ -1,6 +1,21 @@
+# Define where your bookmark files is stored
 BMS_BASE="$HOME/.local/share/dmbm/bms"
+
+# Define where your user config is stored
 USER_CONF="$HOME/.config/dmbm/config"
+
+# Define how many lines dmenu's dropdown should have
 MAX_DROPDOWN_LENGTH=20
+
+# Append a return after outputting to cursor?
 APPEND_RETURN=false
+
+# Open the bookmark in your default browser? (defined as $BROWSER)
 OPEN_BROWSER=false
+
+# Set the delimiter for all bookmark files - can be useful if you need to use
+# the default delimiter (|) in your bookmarks
 NAME_URL_DELIM="|"
+
+# Define the log file output - will only be used if DEBUG=true
+LOGFILE="$HOME/.dmbm.log"

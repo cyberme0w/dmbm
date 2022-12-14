@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Print ${1} if DEBUG is set to true
-debug() { [[ $DEBUG -eq true ]] && echo "${1}" ; }
+debug_log() { [[ $DEBUG ]] && echo "$[1]" >> "$LOGFILE" ; }
 
 # Print version to STDOUT
 exit_with_version() { echo "dmbm v$VERSION" ; exit 0 ; }
@@ -88,8 +88,8 @@ edit_bookmark() {
   [[ -z $new_url ]] && exit
 
   # Output some info for debugging
-  debug "New name: $new_name"
-  debug "New URL: $new_url"
+  debug_log "New name: $new_name"
+  debug_log "New URL: $new_url"
 
   # Replace bookmark in-file
   sed -i "s!$old_row!$new_name\|$new_url!g" "$BMS_PATH/list"
@@ -121,16 +121,15 @@ USAGE='dmbm - the browser-independent bookmark manager for dmenu
 USAGE:
   dmbm [-r] - select and paste a bookmark [with return]
   dmbm -b   - open bookmark with browser
+  dmbm -c   - write bookmark to cursor (ignores -b)
   dmbm -a   - add a bookmark
   dmbm -e   - edit a bookmark
   dmbm -d   - delete a bookmark
   dmbm -h   - display this help message
   dmbm -g   - turn on debugging output'
 
-# Import standard config from /etc/dmbm/config
+# Import config from /etc/dmbm/config and if the user config if available
 [[ -f '/etc/dmbm/config' ]] && source '/etc/dmbm/config' || exit 1
-
-# Import user config from $USER_CONF (sourced from default config)
 [[ -f "$USER_CONF" ]] && source "$USER_CONF"
 
 # Process options passed in ARGV
@@ -140,6 +139,7 @@ if [[ $# -gt 0 ]]; then
     -v) exit_with_version ;;
     -r) APPEND_RETURN=true ;;
     -b) OPEN_BROWSER=true ;;
+    -c) OPEN_BROWSER=false ;;
     -d) delete_bookmark; exit 0 ;;
     -a) get_highlight; select_folder ;;
     -e) edit_bookmark; exit 0 ;;
@@ -156,10 +156,15 @@ fi
 # Nothing caused the script to exit - run dmbm normally
 PROMPT="Select a bookmark: BMS"
 select_bookmark
-if [[ $OPEN_BROWSER = 'true' ]]; then
+
+# Write/Open bookmark according to options
+if $OPEN_BROWSER; then
+  debug_log "OPENING SELECTION WITH BROWSER"
   open_selection_with_browser
 else
-  if [[ $APPEND_RETURN = 'true' ]]; then
+  debug_log "WRITING SELECTION TO CURSOR"
+  write_selection_to_cursor
+  if $APPEND_RETURN; then
     write_return_to_cursor
   fi
 fi
