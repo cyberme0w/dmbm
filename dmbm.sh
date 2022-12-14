@@ -1,24 +1,13 @@
 #!/bin/bash
 
-VERSION='PLACEHOLDERFORVERSION'
-USAGE='dmbm - the browser-independent bookmark manager for dmenu
-USAGE:
-  dmbm [-r] - select and paste a bookmark [with return]
-  dmbm -b   - open bookmark with browser
-  dmbm -a   - add a bookmark
-  dmbm -e   - edit a bookmark
-  dmbm -d   - delete a bookmark
-  dmbm -h   - display this help message
-  dmbm -g   - turn on debugging output'
-
 # Print ${1} if DEBUG is set to true
 debug() { [[ $DEBUG -eq true ]] && echo "${1}" ; }
 
 # Print version to STDOUT
-exit_with_version() { echo "dmbm v$VERSION" && exit 0 ; }
+exit_with_version() { echo "dmbm v$VERSION" ; exit 0 ; }
 
 # Show USAGE and quit gracefully
-exit_with_usage() { echo "$USAGE" && exit 0 ; }
+exit_with_usage() { echo "$USAGE" ; exit 0 ; }
 
 # Run a standard dmenu prompt with optional parameters
 run_prompted_dmenu() {
@@ -33,32 +22,37 @@ run_prompted_dmenu() {
 run_yes_no_dmenu() {
   prompt=${1:-"Are you sure?"}
   res=$(run_prompted_dmenu "Yes\nNo" "$prompt" 2)
-  [[ "$res" == "Yes" ]] && return 1
+  [[ $res == "Yes" ]] && return 1
   return 0
 }
 
-# Initialize BMS and add any folders in the current BMS_PATH to the variable
-add_folders_to_bms_list() {
+# Initialize/clear BMS and add any folders in the current BMS_PATH to the variable
+add_folders_to_bms() {
   BMS=''
   FOLDERS=$(ls --group-directories-first "$BMS_PATH" | head -n -1)
-  [[ -n "$FOLDERS" ]] && BMS="$FOLDERS\n"
+  [[ -n "$FOLDERS" ]] && BMS="$FOLDERS"
 }
 
 # Append any single bookmarks in the current BMS_PATH to BMS
-add_singles_to_bms_list() {
-  # Throw all rows into a variable
-  SINGLES=$(cat "$BMS_PATH/list")
-  declare -a singles_for_bms
-
-  # Parse each line
-  readarray -d "\n" -t singles_arr <<< "$SINGLES"
-  for line in "${singles_arr[@]}"; do
-    readarray -d "|" -t l <<< "$line"
-    #echo "${l[0]}"
-    #echo "${l[1]}"
+add_singles_to_bms() {
+  # Empty the current BMS_URLS
+  for name in "${!BMS_URLS[@]}"; do
+    unset BMS_URLS[$name]
   done
-  
-  BMS="$BMS""$SINGLES"
+
+  # Iterate over each bookmark and append it to the BMS_URLS hashmap
+  while read -r line; do
+    readarray -d "|" -t pos <<< "$line"
+    BMS_URLS[${pos[0]}]="${pos[1]//[$'\n']}"
+  done < "$BMS_PATH/list"
+
+  # Add a separator between folders and bookmarks
+  [[ -n $BMS ]] && [[ -n ${!BMS_URLS[@]} ]] && BMS+="\n----------"
+
+  # Add bookmarks to BMS
+  for name in "${!BMS_URLS[@]}"; do
+    [[ -z $BMS ]] && BMS+="$name" || BMS+="\n$name"
+  done
 }
 
 # Prompt user to select a bookmark, starting at BMS_BASE
@@ -66,19 +60,17 @@ select_bookmark() {
   BMS_PATH="$BMS_BASE"
   while :
   do
-    add_folders_to_bms_list
-    add_singles_to_bms_list
-    
-    SELECTION=$(run_prompted_dmenu "$BMS" "$PROMPT" "$MAX_DROPDOWN_LENGTH")
+    add_folders_to_bms
+    add_singles_to_bms
+
+    SELECTION="$(run_prompted_dmenu "$BMS" "$PROMPT" "$MAX_DROPDOWN_LENGTH")"
     [[ -z "$SELECTION" ]] && exit 0
     [[ ! -d "$BMS_PATH/$SELECTION" ]] && break
     PROMPT="$PROMPT/$SELECTION"
     BMS_PATH="$BMS_PATH/$SELECTION"
   done
 
-  readarray -d "|" -t arr <<< "$SELECTION"
-  SELECTION_NAME=${arr[0]}
-  SELECTION_URL=${arr[1]}
+  SELECTION_URL=${BMS_URLS[$SELECTION]}
 }
 
 # Prompt user to pick a bookmark, then ask under what name it should be saved, and if the url should be changed
@@ -88,7 +80,7 @@ edit_bookmark() {
   old_row="$SELECTION"
 
   # Make sure the new name is not empty before continuing
-  new_name=$(run_prompted_dmenu "$SELECTION_NAME" "Editing name for bookmark: $SELECTION_NAME" 0)
+  new_name=$(run_prompted_dmenu "$SELECTION" "Editing name for bookmark: $SELECTION" 0)
   [[ -z $new_name ]] && exit
 
   # Make sure the URL is not empty before continuing
@@ -122,6 +114,19 @@ open_selection_with_browser() { $BROWSER "$SELECTION_URL" ; }
 # DMBM MAIN #
 #############
 
+declare -A BMS_URLS
+
+VERSION='PLACEHOLDERFORVERSION'
+USAGE='dmbm - the browser-independent bookmark manager for dmenu
+USAGE:
+  dmbm [-r] - select and paste a bookmark [with return]
+  dmbm -b   - open bookmark with browser
+  dmbm -a   - add a bookmark
+  dmbm -e   - edit a bookmark
+  dmbm -d   - delete a bookmark
+  dmbm -h   - display this help message
+  dmbm -g   - turn on debugging output'
+
 # Import standard config from /etc/dmbm/config
 [[ -f '/etc/dmbm/config' ]] && source '/etc/dmbm/config' || exit 1
 
@@ -151,9 +156,11 @@ fi
 # Nothing caused the script to exit - run dmbm normally
 PROMPT="Select a bookmark: BMS"
 select_bookmark
-if [[ $OPEN_BROWSER == 'true' ]]; then
+if [[ $OPEN_BROWSER = 'true' ]]; then
   open_selection_with_browser
 else
-  write_selection_to_cursor
+  if [[ $APPEND_RETURN = 'true' ]]; then
+    write_return_to_cursor
+  fi
 fi
 
